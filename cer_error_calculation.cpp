@@ -8,18 +8,11 @@
 #include<tr1/unordered_map>
 #include<vector>
 #include<algorithm>
-#include <iomanip>
+#include<iomanip>
 using namespace std;
 using namespace std::tr1;
 vector<string>byte{"千","百","十",""};
 vector<string>value{"零","一","二","三","四","五","六","七","八","九"};
-unordered_map<string,vector<string>>label_use,model_use;
-struct node{
-    int val,i_error,s_error,d_error,n;//各个变量意思为:需要操作的次数val,插入错误数量i_error,替换错误数量s_error,删除错误数量d_error,当前点的lab长度。
-    node():val(0),i_error(0),s_error(0),d_error(0),n(0){}//显示初始化每个值起始都为0
-};
-int sentence=0,word=0,sentence_error=0,word_error=0,s_error_all=0,i_error_all=0,d_error_all=0;//sentence句子总数，word词总数，sentence_error句子错误总数
-//word_error词错误总数，之后的都是各类型错误总数。
 bool next_dig=0;
 string transform_four(string dig_str){//针对有4位数字的情况，专门封装处理。
     //针对中文语法，出现连续相隔1位及以上的0，这时候只会补上一个零字。
@@ -246,136 +239,9 @@ void build_change(string st,vector<string> &label){
         }
     }
 }
-void edit_distance(vector<string> &label,vector<string> &rec){//编辑距离计算的函数，一个动态规划算法
-    vector<string>label1,rec1;//中间用的label字符串和rec字符串
-    for(int i=0;i<label.size();i++){
-        if(label[i]!=" "){
-            transform(label[i].begin(), label[i].end(), label[i].begin(), ::toupper);//非空的才加进来，然后转换成全大写
-            label1.push_back(label[i]);
-        }
-    }
-    for(int i=0;i<rec.size();i++){
-        if(rec[i]!=" "){
-            transform(rec[i].begin(), rec[i].end(), rec[i].begin(), ::toupper);//与label同理
-            rec1.push_back(rec[i]);
-        }
-    }
-    string a="";
-    sentence++;//句子数要加1
-    if(rec.size()==1&&rec[0]==a){//如果识别文本是空的，这里是有些文本会出现的特殊情况，目前经考虑实际上并不会发生这个情况，因为空的都被过滤掉了
-      printf("CER: %.2lf %% N:%d I:%d D:%d S:%d\n",100*1.0,label1.size(), 0,label1.size(),0);//空的就是百分百错误了。
-      cout<<"lab:";
-      for(int i=0;i<label.size();i++){
-          cout<<label[i]<<" ";
-      }
-      cout<<endl;
-      cout<<"rec:  ";
-      for(int i=0;i<rec.size();i++){
-          cout<<rec[i];
-      }
-      cout<<endl;
-      int sum_error=label1.size();
-      if(sum_error!=0){
-        sentence_error++;//句错误直接加1
-        word_error+=sum_error;//词错误直接加上标注文本的词数量。
-        d_error_all+=label1.size();//当前的错误类型很明显是删除错误。
-      }
-      cout<<endl<<endl<<endl;
-    }else{
-      word+=label1.size();
-      vector<vector<node>>dp(label1.size()+1,vector<node>(rec1.size()+1));//动态规划数组，记录第i个label串和第j个rec串匹配时，需要的最小编辑距离。
-      dp[0][0].val=0;
-      for(int i=1;i<=label1.size();i++){
-        dp[i][0].val=dp[i-1][0].val+1;//初始化，对行是lab的操作，他这时候对应第0个rec串，即是删除错误，错误数量递增。
-        dp[i][0].d_error=dp[i-1][0].d_error+1;
-        dp[i][0].n=dp[i-1][0].n+1;
-      }
-      for(int i=1;i<=rec1.size();i++){
-        dp[0][i].val=dp[0][i-1].val+1;//初始化，对列是rec的操作，他这时候对应第0个lab串，即是插入错误，错误数量递增。
-        dp[0][i].i_error=dp[0][i-1].i_error+1;      
-      }
-      for(int i=0;i<label1.size();i++){
-          for(int j=0;j<rec1.size();j++){
-              if(label1[i]==rec1[j]){///如果当前字符串相等，直接由二者各自减一的点匹配有效的位置转移下来，只需要对用以记录lab字符数量的n+1即可。
-                dp[i+1][j+1]=dp[i][j];
-                dp[i+1][j+1].n++;
-              }
-              else{
-                if(i<j){//区分状态，在lab比rec少的时候，都是优先替换错误，再之插入错误，最后删除错误。
-                    if(dp[i][j].val<=dp[i+1][j].val&&dp[i][j].val<=dp[i][j+1].val){
-                      dp[i+1][j+1].i_error=dp[i][j].i_error;
-                      dp[i+1][j+1].d_error=dp[i][j].d_error;
-                      dp[i+1][j+1].val=dp[i][j].val+1;
-                      dp[i+1][j+1].n=dp[i][j].n+1;
-                      dp[i+1][j+1].s_error=dp[i][j].s_error+1;
-                    }else{
-                      if(dp[i+1][j].val<=dp[i][j].val&&dp[i+1][j].val<=dp[i][j+1].val){
-                        dp[i+1][j+1].i_error=dp[i+1][j].i_error+1;
-                        dp[i+1][j+1].d_error=dp[i+1][j].d_error;
-                        dp[i+1][j+1].val=dp[i+1][j].val+1;
-                        dp[i+1][j+1].n=dp[i+1][j].n;
-                        dp[i+1][j+1].s_error=dp[i+1][j].s_error;
-                      }else{
-                        dp[i+1][j+1].i_error=dp[i][j+1].i_error;
-                        dp[i+1][j+1].d_error=dp[i][j+1].d_error+1;
-                        dp[i+1][j+1].val=dp[i][j+1].val+1;
-                        dp[i+1][j+1].n=dp[i][j+1].n+1;
-                        dp[i+1][j+1].s_error=dp[i][j+1].s_error;
-                      }
-                    }
-                }else{//区分状态，在lab比rec多的时候，都是优先替换错误，再之删除错误，最后插入错误。
-                  if(dp[i][j].val<=dp[i+1][j].val&&dp[i][j].val<=dp[i][j+1].val){
-                      dp[i+1][j+1].i_error=dp[i][j].i_error;
-                      dp[i+1][j+1].d_error=dp[i][j].d_error;
-                      dp[i+1][j+1].val=dp[i][j].val+1;
-                      dp[i+1][j+1].n=dp[i][j].n+1;
-                      dp[i+1][j+1].s_error=dp[i][j].s_error+1;
-                  }else{
-                    if(dp[i][j+1].val<=dp[i][j].val&&dp[i][j+1].val<=dp[i+1][j].val){
-                        dp[i+1][j+1].i_error=dp[i][j+1].i_error;
-                        dp[i+1][j+1].d_error=dp[i][j+1].d_error+1;
-                        dp[i+1][j+1].val=dp[i][j+1].val+1;
-                        dp[i+1][j+1].n=dp[i][j+1].n+1;
-                        dp[i+1][j+1].s_error=dp[i][j+1].s_error;
-                    }else{
-                        dp[i+1][j+1].i_error=dp[i+1][j].i_error+1;
-                        dp[i+1][j+1].d_error=dp[i+1][j].d_error;
-                        dp[i+1][j+1].val=dp[i+1][j].val+1;
-                        dp[i+1][j+1].n=dp[i+1][j].n;
-                        dp[i+1][j+1].s_error=dp[i+1][j].s_error;
-                    }
-                  }
-                }
-              }
-          }
-      }
-      printf("CER: %.2lf %% N: %d I: %d D: %d S: %d\n",(dp[label1.size()][rec1.size()].val*1.0/label1.size()*1.0)*100,dp[label1.size()][rec1.size()].n, dp[label1.size()][rec1.size()].i_error,dp[label1.size()][rec1.size()].d_error,dp[label1.size()][rec1.size()].s_error);//输出各类信息至终端
-      cout<<"lab:";
-      for(int i=0;i<label.size();i++){
-          cout<<label[i]<<" ";
-      }
-      cout<<endl;
-      cout<<"rec:";
-      for(int i=0;i<rec.size();i++){
-          cout<<rec[i]<<" ";
-      }
-      cout<<endl;
-      int sum_error=dp[label1.size()][rec1.size()].i_error+dp[label1.size()][rec1.size()].d_error+dp[label1.size()][rec1.size()].s_error;
-      //3种错误类型总和
-      if(sum_error!=0){
-        sentence_error++;//句子错误数增加
-        word_error+=sum_error;//词错误数增加3类错误总数
-        s_error_all+=dp[label1.size()][rec1.size()].s_error;//各类错误数量自己增加
-        i_error_all+=dp[label1.size()][rec1.size()].i_error;
-        d_error_all+=dp[label1.size()][rec1.size()].d_error;
-      }
-      cout<<endl<<endl<<endl;
-    }
-}
 int main(int argc,char** argv)
 {
     ifstream inFile1(argv[1], ios::in);//读文件，lab文本
-    ifstream inFile2(argv[2], ios::in);//读文件，rec文本
     string lineStr;
     while (getline(inFile1, lineStr))//按行读取文件
     {
@@ -393,7 +259,7 @@ int main(int argc,char** argv)
           }
         }
         if(lineArray.size()==1){
-          label.push_back(a);//如果他只有音频名称，那么就以音频名称作为键，插入空字符串的值
+          label.push_back(a);//如果他只有处理文件名称但没有具体文本，那么就以处理文件名称作为键，插入空字符串的值。
         }else{
           for(int i=2;i<lineArray.size();i++){//将有空格分割所有的句子合并到一个句子上待处理。
             lineArray[1]+=' ';
@@ -408,53 +274,8 @@ int main(int argc,char** argv)
                 break;
             }
         }
-        label_use[lineArray[0]]=label;//这个音频作为键，插入label这个标注字符数组。
-    }
-    while (getline(inFile2, lineStr))//同上操作。
-    {
-        if(lineStr[0]==' '){
-            continue;
-        }
-        stringstream ss(lineStr);
-        string str;
-        vector<string>lineArray;
-        vector<string>model;
-        const string a="";
-        while (getline(ss, str,' ')){
-          if(str!=a){
-            lineArray.push_back(str);
-          }
-        }
-        if(lineArray.size()==1){
-          model.push_back(a);
-        }else{
-          for(int i=2;i<lineArray.size();i++){
-            lineArray[1]+=' ';
-            lineArray[1]+=lineArray[i];
-          }
-          build_change(lineArray[1],model);
-        }
-        for(auto iter=model.begin();iter!=model.end();iter++){
-            if(*iter==" "){
-                model.erase(iter);
-            }else{
-                break;
-            }
-        }
-        model_use[lineArray[0]]=model;//原理同标注文件处理相同，这个音频作为键，插入model(rec)这个标注字符数组
+        label_use[lineArray[0]]=label;//这个处理文件名称作为键，插入label这个标注字符数组。
     }
     inFile1.close();
-    inFile2.close();//文件流读取完要关闭。
-    for(auto iter=model_use.begin();iter!=model_use.end();iter++){
-        if(label_use.find(iter->first)!=label_use.end()){//如果rec中出现的键(音频号)在label中也有出现。
-           cout<<"utt:"<<iter->first<<endl;//输出其音频号
-           edit_distance(label_use[iter->first],iter->second);//做编辑距离计算。 
-        }
-    }
-    cout<<"==========================================================================="<<endl;
-    printf("WER-mean:%.2lf%%",(word_error*1.0/word)*100);//字错误率=字错误数量/字总数
-    cout<<" N:"<<word<<" all_error:"<<word_error<<" S:"<<s_error_all<<" I:"<<i_error_all<<" D:"<<d_error_all<<endl;//各类错误总数量
-    printf("SER-mean:%.2lf%%",(sentence_error*1.0/sentence)*100);//句错误率=句错误数/总句数
-    cout<<" all-sentence:"<<sentence<<" error:"<<sentence_error<<endl;
     return 0;
 }
